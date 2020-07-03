@@ -7,5 +7,5 @@ setup(
    author='O.S. Agba',
    author_email='',
    packages=find_packages(),
-   install_requires=['pandas', 'numpy', 'matplotlib', 'requests', 'tabulate', 'scikit-learn', 'python-dateutil', 'pytorch'],
+   install_requires=['pandas', 'numpy', 'matplotlib', 'requests', 'tabulate', 'scikit-learn', 'python-dateutil', 'torch'],
 )
