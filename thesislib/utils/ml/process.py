@@ -4,9 +4,33 @@ import pandas as pd
 from sklearn.model_selection import StratifiedShuffleSplit
 import pathlib
 import hashlib
+from glob import glob
 
+from ..stringutils import  slugify
 
 RACE_CODE = {'white': 0, 'black':1, 'asian':2, 'native':3, 'other':4}
+
+
+def get_symptom_condition_map(module_dir):
+    module_files = glob(os.path.join(module_dir, "*.json"))
+    symptom_map = {}
+    condition_map = {}
+    for file in module_files:
+        with open(file) as fp:
+            module = json.load(fp)
+        states = module.get("states")
+        for state in states.values():
+            if state.get("type") != "Symptom" and state.get("type") != "ConditionOnset":
+                continue
+            if state.get("type") == "ConditionOnset":
+                code = state.get("codes")[0]
+                condition_map[code["code"]] = slugify(code.get("display"))
+                continue
+            symptom_code = state.get("symptom_code")
+            slug = slugify(symptom_code.get("display"))
+            slug_hash  = hashlib.sha224(slug.encode("utf-8")).hexdigest()
+            symptom_map[slug_hash] = slug
+    return symptom_map, condition_map
 
 
 def _symptom_transform(val, labels, is_nlice=False):
