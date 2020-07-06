@@ -16,7 +16,8 @@ class AiBasicMedEnv:
             data_file,
             symptom_map_file,
             condition_map_file,
-            clf
+            clf,
+            **kwargs
     ):
         """
         data_file: A file of generated patient, symptoms, condition data
@@ -53,6 +54,11 @@ class AiBasicMedEnv:
         self.inquiry_list = set([])
 
         self.RACE_CODE = {'white': 0, 'black': 1, 'asian': 2, 'native': 3, 'other': 4}
+
+        self.reward_inquiry = kwargs.get('reward_inquiry', -1)
+        self.reward_repeated = kwargs.get('reward_repeated', -2)
+        self.reward_diagnose_correct = kwargs.get('reward_diagnose_correct', 5)
+        self.reward_diagnose_incorrect = kwargs.get('reward_diagnose_incorrect', 0)
 
     def check_file_exists(self):
         files = [self.data_file, self.symptom_map_file, self.condition_map_file]
@@ -177,7 +183,7 @@ class AiBasicMedEnv:
         if action_value in self.inquiry_list:
             # repeated inquiry
             # return self.state, -1, True # reward is -3 if inquiry is repeated
-            return self.state, -3, False
+            return self.state, self.reward_repeated, False
 
         # does the patient have the symptom
         if self.patient_has_symptom(action_value):
@@ -188,7 +194,7 @@ class AiBasicMedEnv:
         self.state.symptoms[action_value] = value
         self.inquiry_list.add(action_value)
 
-        return self.state, -1, False # reward is -1 for non-repeated inquiry
+        return self.state, self.reward_inquiry, False # reward is -1 for non-repeated inquiry
 
     def get_patient_vector(self):
         patient_vector = np.zeros(3 + self.num_symptoms, dtype=np.uint8)
@@ -210,15 +216,11 @@ class AiBasicMedEnv:
         return prediction
 
     def diagnose(self, action_value):
-        # enforce that there should be at least one inquiry in addition to the initial symptom
-        if len(self.inquiry_list) < 2:
-            return self.state, -3, False # ask at least one question before attempting to diagnose
-
         # we'll need to make a prediction
         prediction = self.predict_condition()[0]
 
         is_correct = action_value == prediction
-        reward = 1 if is_correct else 0
+        reward = self.reward_diagnose_correct if is_correct else self.reward_diagnose_incorrect
 
         return None, reward, True
 

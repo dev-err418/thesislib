@@ -1,5 +1,5 @@
 from . import utils
 
-__VERSION__="1.0.0"
+__VERSION__="1.1.1"
 
 __all__ = ['utils']
