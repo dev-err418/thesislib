@@ -578,3 +578,289 @@ def train_ai_med_nb(
         res = False
 
     return res
+
+
+def train_ai_med_adv_rf(data_file, symptoms_db_json, output_dir, rfparams=None, name="", location="QCE"):
+    logger = report.Logger("Random Forest %s Classification on %s" % (name, location))
+
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    if rfparams is None or not isinstance(rfparams, models.RFParams):
+        rfparams = models.RFParams()
+
+    try:
+        logger.log("Starting Random Forest Classification")
+        begin = timer()
+        with open(symptoms_db_json) as fp:
+            symptoms_db = json.load(fp)
+            num_symptoms = len(symptoms_db)
+
+        logger.log("Reading CSV")
+        start = timer()
+        df = pd.read_csv(data_file, index_col='Index')
+        end = timer()
+        logger.log("Reading CSV: %.5f secs" % (end - start))
+
+        classes = df.LABEL.unique().tolist()
+
+        logger.log("Prepping Sparse Representation")
+        start = timer()
+        label_values = df.LABEL.values
+        ordered_keys = ['GENDER', 'RACE', 'AGE', 'SYMPTOMS']
+        df = df[ordered_keys]
+
+        sparsifier = models.ThesisAIMEDAdvSymptomSparseMaker(num_symptoms=num_symptoms)
+
+        data_csc = sparsifier.fit_transform(df)
+        end = timer()
+        logger.log("Prepping Sparse Representation: %.5f secs" % (end - start))
+
+        logger.log("Running RF Classifier Cross Validate")
+        start = timer()
+        clf = RandomForestClassifier(
+            n_estimators=rfparams.n_estimators,
+            criterion=rfparams.criterion,
+            max_depth=rfparams.max_depth,
+            min_samples_split=rfparams.min_samples_split,
+            min_samples_leaf=rfparams.min_samples_leaf,
+            min_weight_fraction_leaf=0.0,
+            max_features='auto',
+            max_leaf_nodes=None,
+            min_impurity_decrease=0.0,
+            min_impurity_split=None,
+            bootstrap=True,
+            oob_score=False,
+            n_jobs=2,
+            random_state=None,
+            verbose=0,
+            warm_start=False,
+            class_weight=None
+        )
+
+        scorers = report.get_tracked_metrics(classes=classes, metric_name=[
+            report.ACCURACY_SCORE,
+            report.PRECISION_WEIGHTED,
+            report.RECALL_WEIGHTED,
+            report.TOP5_SCORE
+        ])
+
+        cv_res = cross_validate(
+            clf,
+            data_csc,
+            label_values,
+            scoring=scorers,
+            return_train_score=True,
+            return_estimator=True,
+            error_score='raise'
+        )
+
+        end = timer()
+        logger.log("Running RF Classifier Cross Validate: %.5f secs" % (end - start))
+
+        train_results = {
+            "name": "Random Forest",
+        }
+
+        abs_test_score = None
+        for key in scorers.keys():
+            train_score = np.mean(cv_res["train_%s" % key])
+            test_score = np.mean(cv_res["test_%s" % key])
+            train_results[key] = {
+                "train": train_score,
+                "test": test_score
+            }
+            logger.log("RF Finished score: %s.\nTrain: %.5f\nTest: %.5f"
+                       % (key, train_score, test_score))
+            if key == report.ACCURACY_SCORE:
+                abs_test_score = np.abs(cv_res["train_%s" % key] - test_score)
+
+        end = timer()
+        logger.log("Calculating Accuracy: %.5f secs" % (end - start))
+
+        train_results_file = os.path.join(output_dir, "rf_train_results_sparse_grid_search_best.json")
+        with open(train_results_file, "w") as fp:
+            json.dump(train_results, fp)
+
+        finish = timer()
+        logger.log("Completed Random Forest Classification: %.5f secs" % (finish - begin))
+
+        # save model
+        if abs_test_score is not None:
+            estimator_idx = np.argmin(abs_test_score)  # pick the closest to the average
+        else:
+            estimator_idx = 0  # pick the first one
+
+        clf = cv_res['estimator'][estimator_idx]
+        estimator_serialized = {
+            "clf": clf,
+            "name": "random forest classifier on sparse"
+        }
+
+        estimator_serialized_file = os.path.join(output_dir, "rf_serialized_sparse.joblib")
+        joblib.dump(estimator_serialized, estimator_serialized_file)
+
+        res = True
+    except Exception as e:
+        message = e.__str__()
+        logger.log(message, logging.ERROR)
+        res = False
+
+    return res
+
+
+def train_ai_med_adv_nb(
+        data_file,
+        symptoms_db_json,
+        output_dir, name="",
+        location="QCE"
+):
+    logger = report.Logger("Naive Bayes %s Classification on %s" %(name, location))
+
+    pathlib.Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    try:
+        message = "Starting Naive Bayes Classification"
+        logger.log(message)
+        begin = timer()
+        with open(symptoms_db_json) as fp:
+            symptoms_db = json.load(fp)
+            num_symptoms = len(symptoms_db)
+
+        logger.log("Reading CSV")
+        start = timer()
+        data = pd.read_csv(data_file, index_col='Index')
+        end = timer()
+        logger.log("Reading CSV: %.5f secs" % (end - start))
+
+        classes = data.LABEL.unique().tolist()
+
+        logger.log("Prepping Sparse Representation")
+        start = timer()
+        label_values = data.LABEL.values
+        ordered_keys = ['GENDER', 'RACE', 'AGE', 'SYMPTOMS']
+        data = data[ordered_keys]
+
+        sparsifier = models.ThesisAIMEDAdvSymptomSparseMaker(num_symptoms=num_symptoms)
+
+        data = sparsifier.fit_transform(data)
+
+        end = timer()
+        logger.log("Prepping Sparse Representation: %.5f secs" % (end - start))
+
+        logger.log("Cross validate on Training Naive Bayes")
+        start = timer()
+        gender_clf = naive_bayes.BernoulliNB()
+        race_clf = models.ThesisCategoricalNB()
+        age_clf = naive_bayes.GaussianNB()
+        symptom_clf = naive_bayes.BernoulliNB()
+        nlice_gaussian = naive_bayes.GaussianNB()
+        nlice_categorical = models.ThesisCategoricalNB()
+
+        num_features = num_symptoms*8 + 3
+        reg_indices = np.array([0, 1, 2])
+        symptom_indices = np.arange(3, num_features, 8, dtype=np.uint16)
+        nature_indices = symptom_indices + 1
+        location_indices = symptom_indices + 2
+        intensity_indices = symptom_indices + 3
+        duration_indices = symptom_indices + 4
+        onset_indices = symptom_indices + 5
+        excitation_indices = symptom_indices + 6
+        frequency_indices = symptom_indices + 7
+
+        # order
+        # reg_indices(as normal), symptom_indices (bernoulli),
+        # nature, location, intensity, excitation, frequency (categorical)
+        # duration, onset (gaussian)
+        new_indices = np.hstack([
+            reg_indices,
+            symptom_indices,
+            nature_indices, location_indices, intensity_indices, excitation_indices, frequency_indices,
+            duration_indices, onset_indices
+        ])
+
+        symptom_indices_end = 3 + num_symptoms
+        categorical_indices_end = symptom_indices_end + 33 * 5 # there are five categorical groups each 33 columns wide
+
+        data = data[:, new_indices]
+
+        classifier_map = [
+            [gender_clf, [0, False]],
+            [race_clf, [1, False]],
+            [age_clf, [2, False]],
+            [symptom_clf, [(3, symptom_indices_end), True]], # pick the yes/no symptom questions
+            [nlice_categorical, [(symptom_indices_end, categorical_indices_end), False]],
+            [nlice_gaussian, [(categorical_indices_end, None), False]]
+        ]
+
+        clf = models.ThesisSparseNaiveBayes(classifier_map=classifier_map, classes=classes)
+
+        scorers = report.get_tracked_metrics(classes=classes, metric_name=[
+            report.ACCURACY_SCORE,
+            report.PRECISION_WEIGHTED,
+            report.RECALL_WEIGHTED,
+            report.TOP5_SCORE
+        ])
+
+        cv_res = cross_validate(
+            clf,
+            data,
+            label_values,
+            scoring=scorers,
+            return_train_score=True,
+            return_estimator=True,
+            error_score='raise'
+        )
+
+        train_results = {
+            "name": "Naive Bayes Classifier AI MED",
+        }
+
+        abs_test_score = None
+
+        for key in scorers.keys():
+            train_score = np.mean(cv_res["train_%s" % key])
+            test_score = np.mean(cv_res["test_%s" % key])
+            train_results[key] = {
+                "train": train_score,
+                "test": test_score
+            }
+            if key == report.ACCURACY_SCORE:
+                abs_test_score = np.abs(cv_res["test_%s" % key] - test_score)
+
+            logger.log("NB Finished score: %s.\nTrain: %.5f\nTest: %.5f"
+                       % (key, train_score, test_score))
+
+        end = timer()
+        logger.log("Calculating Accuracy: %.5f secs" % (end - start))
+
+        train_results_file = os.path.join(output_dir, "nb_train_results_sparse.json")
+        with open(train_results_file, "w") as fp:
+            json.dump(train_results, fp, indent=4)
+
+        finish = timer()
+        logger.log("Completed Naive Classification: %.5f secs" % (finish - begin))
+
+        # save model
+        if abs_test_score is not None:
+            estimator_idx = np.argmin(abs_test_score) # pick the closest to the average
+        else:
+            estimator_idx = 0 # pick the first one
+
+        clf = cv_res['estimator'][estimator_idx]
+        estimator_serialized = {
+            "clf": clf,
+            "name": "naive bayes classifier on sparse"
+        }
+
+        estimator_serialized_file = os.path.join(output_dir, "nb_serialized_sparse.joblib")
+        joblib.dump(estimator_serialized, estimator_serialized_file)
+
+        res = True
+    except Exception as e:
+        raise e
+        message = e.__str__()
+        logger.log(message, logging.ERROR)
+        res = False
+
+    return res
+

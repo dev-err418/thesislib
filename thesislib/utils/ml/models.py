@@ -70,7 +70,7 @@ class ThesisCategoricalNB(CategoricalNB):
                 if self.skip_zero:
                     maxidx = np.argmax(counts[1:])
                 else:
-                    maxidx = np.argmax(counts[1:])
+                    maxidx = np.argmax(counts)
 
                 self.default_categories.append(unique[maxidx])
 
@@ -239,6 +239,40 @@ class ThesisNaiveBayes(BaseEstimator, ClassifierMixin):
         clf.is_partial = is_partial
 
         return clf
+
+
+class ThesisAIMEDAdvSymptomSparseMaker(BaseEstimator):
+    def __init__(self, num_symptoms, categorical_indices=None):
+        self.num_symptoms = num_symptoms
+        self.categorical_indices = categorical_indices
+
+    def fit_transform(self, df, y=None):
+        symptoms = df.SYMPTOMS
+        df = df.drop(columns=['SYMPTOMS'])
+
+        dense_matrix = sparse.coo_matrix(df.values)
+        symptoms = symptoms.apply(lambda v: [idx for idx in v.split(";")])
+
+        columns = []
+        rows = []
+        data = []
+        for idx, val in enumerate(symptoms):
+            rows += [idx] * len(val)
+            cols_data = []
+            cols = []
+            for item in val:
+                _ = item.split("|")
+                cols.append(int(_[0]))
+                cols_data.append(int(_[1]))
+            columns += cols
+            data += cols_data
+
+        symptoms_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0],self.num_symptoms*8))
+
+        data_coo = sparse.hstack([dense_matrix, symptoms_coo])
+        data_csc = data_coo.tocsc()
+
+        return data_csc
 
 
 class ThesisAIMEDSymptomSparseMaker(BaseEstimator):

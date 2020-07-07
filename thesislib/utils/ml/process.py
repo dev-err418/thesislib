@@ -53,7 +53,6 @@ def _symptom_transform(val, labels, is_nlice=False):
         for item in parts:
             _ = labels.get(item)
             if _ is None:
-                print(item)
                 raise ValueError("Unknown symptom")
             indices.append(_)
         res = ",".join(indices)
@@ -103,6 +102,70 @@ def parse_data(
     df = df[ordered_keys]
     df.index.name = "Index"
 
+    output_file = os.path.join(output_path, "%s_sparse.csv" % filename)
+    df.to_csv(output_file)
+
+    return output_file
+
+
+def parse_data_nlice_adv(
+        filepath,
+        conditions_db_json,
+        symptoms_db_json,
+        output_path,
+        body_parts_json,
+        excitation_enc_json,
+        frequency_enc_json,
+        nature_enc_json,
+        vas_enc_json
+        ):
+    pathlib.Path(output_path).mkdir(parents=True, exist_ok=True)
+    with open(symptoms_db_json) as fp:
+        symptoms_db = json.load(fp)
+
+    with open(conditions_db_json) as fp:
+        conditions_db = json.load(fp)
+
+    with open(body_parts_json) as fp:
+        body_parts = json.load(fp)
+
+    with open(excitation_enc_json) as fp:
+        excitation_enc = json.load(fp)
+
+    with open(frequency_enc_json) as fp:
+        frequency_enc = json.load(fp)
+
+    with open(nature_enc_json) as fp:
+        nature_enc = json.load(fp)
+
+    with open(vas_enc_json) as fp:
+        vas_enc = json.load(fp)
+
+    usecols = ['GENDER', 'RACE', 'AGE_BEGIN', 'PATHOLOGY', 'NUM_SYMPTOMS', 'SYMPTOMS']
+
+    df = pd.read_csv(filepath, usecols=usecols)
+    filename = filepath.split("/")[-1]
+
+    # drop the guys that have no symptoms
+    df = df[df.NUM_SYMPTOMS > 0]
+    df['LABEL'] = df.PATHOLOGY.apply(lambda v: conditions_db.get(v))
+    df['RACE'] = df.RACE.apply(lambda v: RACE_CODE.get(v))
+    df['GENDER'] = df.GENDER.apply(lambda gender: 0 if gender == 'F' else 1)
+    df = df.rename(columns={'AGE_BEGIN': 'AGE'})
+
+    df['SYMPTOMS'] = df.SYMPTOMS.apply(
+        transform_symptoms_nlice_adv,
+        symptom_db=symptoms_db,
+        body_parts=body_parts,
+        excitation_enc=excitation_enc,
+        frequency_enc=frequency_enc,
+        nature_enc=nature_enc,
+        vas_enc=vas_enc
+    )
+
+    ordered_keys = ['LABEL', 'GENDER', 'RACE', 'AGE', 'SYMPTOMS']
+    df = df[ordered_keys]
+    df.index.name = "Index"
     output_file = os.path.join(output_path, "%s_sparse.csv" % filename)
     df.to_csv(output_file)
 
@@ -171,4 +234,67 @@ def tranform_symptoms(symptom_str, transformation_map, symptom_combination_encod
         encoding = symptom_combination_encoding_map[key][ordered]
         symptom_hash = hashlib.sha224(key.encode("utf-8")).hexdigest()
         transformed_symptoms.append("|".join([symptom_hash, str(encoding)]))
+    return ";".join(transformed_symptoms)
+
+
+def transform_symptoms_nlice_adv(
+        symptom_str,
+        symptom_db,
+        body_parts,
+        excitation_enc,
+        frequency_enc,
+        nature_enc,
+        vas_enc
+):
+    symptom_list = symptom_str.split(";")
+    transformed_symptoms = []
+    for _symp_def in symptom_list:
+        _symptom, _nature, _location, _intensity, _duration, _onset, _exciation, _frequency, _ = _symp_def.split(":")
+
+        _symptom_idx = symptom_db[_symptom] * 8
+
+        _nature_idx = _symptom_idx + 1
+        _nature_val = 1 if _nature == "" or _nature == "other" else nature_enc.get(_nature)
+
+        _location_idx = _symptom_idx + 2
+        _location_val = 1 if _location == "" or _location == "other" else body_parts.get(_location)
+
+        _intensity_idx = _symptom_idx + 3
+        _intensity_val = 1 if _intensity == "" else vas_enc.get(_intensity)
+
+        _duration_idx = _symptom_idx + 4
+        _duration_val = 0 if _duration == "" else _duration
+
+        _onset_idx = _symptom_idx + 5
+        _onset_val = 0 if _onset == "" else _onset
+
+        _excitation_idx = _symptom_idx + 6
+        _excitation_val = 1 if _exciation == "" else excitation_enc.get(_exciation)
+
+        _frequency_idx = _symptom_idx + 7
+        _frequency_val = 1 if _frequency == "" else frequency_enc.get(_frequency)
+
+        to_transform = [
+            "|".join([str(_symptom_idx), "1"]),
+            "|".join([str(_nature_idx), str(_nature_val)]),
+            "|".join([str(_location_idx), str(_location_val)]),
+            "|".join([str(_intensity_idx), str(_intensity_val)]),
+            "|".join([str(_excitation_idx), str(_excitation_val)]),
+            "|".join([str(_frequency_idx), str(_frequency_val)])
+        ]
+
+        if _duration_val != 0:
+            to_transform.append(
+                "|".join([str(_duration_idx), str(_duration_val)])
+            )
+
+        if _onset_val != 0:
+            to_transform.append(
+                "|".join([str(_onset_idx), str(_onset_val)]),
+            )
+
+        transformed_str = ";".join(to_transform)
+
+        transformed_symptoms.append(transformed_str)
+
     return ";".join(transformed_symptoms)
