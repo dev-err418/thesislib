@@ -335,6 +335,45 @@ class ThesisSymptomSparseMaker(BaseEstimator):
         return data_coo.tocsc()
 
 
+class ThesisSymptomRaceSparseMaker(BaseEstimator):
+    """
+    This makes the race feature a one hot encoded value instread
+    """
+    def __init__(self, num_symptoms):
+        self.num_symptoms = num_symptoms
+
+    def fit_transform(self, df, y=None):
+        symptoms = df.SYMPTOMS
+        race = df.RACE
+
+        df = df.drop(columns=['SYMPTOMS', 'RACE'])
+        if 'LABEL' in df.columns:
+            df = df[['LABEL', 'AGE', 'GENDER']]
+        else:
+            df = df[['AGE', 'GENDER']]
+
+        dense_matrix = sparse.coo_matrix(df.values)
+
+        # shift the symptoms index to allow for the 5 possible race
+        symptoms = symptoms.apply(lambda v: [int(idx) + 5 for idx in v.split(",")])
+
+        columns = []
+        rows = []
+        for idx, val in enumerate(symptoms):
+            race_val = race.iloc[idx]
+            rows += [idx] * (len(val) + 1) # takes care of the race: it's one hot encoded, so!
+            columns += [int(race_val)]
+            columns += val
+
+        data = np.ones(len(rows))
+
+        symptoms_race_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0],self.num_symptoms + 5))
+
+        data_coo = sparse.hstack([dense_matrix, symptoms_race_coo])
+
+        return data_coo.tocsc()
+
+
 class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
     def __init__(self, classifier_map, classes=None):
         self.fitted = False
