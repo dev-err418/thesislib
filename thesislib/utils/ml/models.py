@@ -472,7 +472,7 @@ class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
     @staticmethod
     def load(serialized):
         if type(serialized) is not dict:
-            raise ValueError("Serialized model has to be a dict")
+            raise ValueError("Serialized model has to be a dict. Got %s instead" % type(serialized))
 
         fitted = serialized.get('fitted', None)
         classes = serialized.get('classes', None)
