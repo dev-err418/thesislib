@@ -275,6 +275,48 @@ class ThesisAIMEDAdvSymptomSparseMaker(BaseEstimator):
         return data_csc
 
 
+class ThesisAIMEDAdvSymptomRaceSparseMaker(BaseEstimator):
+    def __init__(self, num_symptoms, categorical_indices=None):
+        self.num_symptoms = num_symptoms
+        self.categorical_indices = categorical_indices
+
+    def fit_transform(self, df, y=None):
+        symptoms = df.SYMPTOMS
+        race = df.RACE
+
+        df = df.drop(columns=['SYMPTOMS', 'RACE'])
+
+        if 'LABEL' in df.columns:
+            df = df[['LABEL', 'AGE', 'GENDER']]
+        else:
+            df = df[['AGE', 'GENDER']]
+
+        dense_matrix = sparse.coo_matrix(df.values)
+        symptoms = symptoms.apply(lambda v: [idx for idx in v.split(";")])
+
+        columns = []
+        rows = []
+        data = []
+        for idx, val in enumerate(symptoms):
+            race_val = race.iloc[idx]
+            rows += [idx] * (len(val) + 1)
+            cols_data = [1]
+            cols = [race_val]
+            for item in val:
+                _ = item.split("|")
+                cols.append(int(_[0]) + 5)
+                cols_data.append(int(_[1]))
+            columns += cols
+            data += cols_data
+
+        symptoms_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0], self.num_symptoms*8 + 5))
+
+        data_coo = sparse.hstack([dense_matrix, symptoms_coo])
+        data_csc = data_coo.tocsc()
+
+        return data_csc
+
+
 class ThesisAIMEDSymptomSparseMaker(BaseEstimator):
     def __init__(self, num_symptoms, categorical_indices=None):
         self.num_symptoms = num_symptoms
@@ -302,6 +344,52 @@ class ThesisAIMEDSymptomSparseMaker(BaseEstimator):
             data += cols_data
 
         symptoms_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0],self.num_symptoms))
+
+        data_coo = sparse.hstack([dense_matrix, symptoms_coo])
+        data_csc = data_coo.tocsc()
+
+        return data_csc
+
+
+class ThesisAIMEDSymptomRaceSparseMaker(BaseEstimator):
+    def __init__(self, num_symptoms, categorical_indices=None):
+        self.num_symptoms = num_symptoms
+        self.categorical_indices = categorical_indices
+
+    def fit_transform(self, df, y=None):
+        symptoms = df.SYMPTOMS
+        race = df.RACE
+
+        df = df.drop(columns=['SYMPTOMS', 'RACE'])
+
+        if 'LABEL' in df.columns:
+            df = df[['LABEL', 'AGE', 'GENDER']]
+        else:
+            df = df[['AGE', 'GENDER']]
+
+        dense_matrix = sparse.coo_matrix(df.values)
+        symptoms = symptoms.apply(lambda v: [idx for idx in v.split(",")])
+
+        columns = []
+        rows = []
+        data = []
+        for idx, val in enumerate(symptoms):
+            race_val = race.iloc[idx]
+            rows += [idx] * (len(val) + 1)
+
+            # the first value will be the race value i.e one-hot encoded with value of 1
+            # the column position will correspond the the race value itself
+
+            cols_data = [1]
+            cols = [int(race_val)]
+            for item in val:
+                _ = item.split("|")
+                cols.append(int(_[0])+5) # offset by the race
+                cols_data.append(int(_[1]))
+            columns += cols
+            data += cols_data
+
+        symptoms_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0],self.num_symptoms + 5))
 
         data_coo = sparse.hstack([dense_matrix, symptoms_coo])
         data_csc = data_coo.tocsc()

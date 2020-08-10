@@ -318,7 +318,7 @@ def train_ai_med_rf(data_file, symptoms_db_json, output_dir, rfparams=None, name
         df = df[ordered_keys]
 
         if is_nlice:
-            sparsifier = models.ThesisAIMEDSymptomSparseMaker(num_symptoms=num_symptoms)
+            sparsifier = models.ThesisAIMEDSymptomRaceSparseMaker(num_symptoms=num_symptoms)
         else:
             sparsifier = models.ThesisSymptomSparseMaker(num_symptoms=num_symptoms)
 
@@ -609,7 +609,7 @@ def train_ai_med_adv_rf(data_file, symptoms_db_json, output_dir, rfparams=None, 
         ordered_keys = ['GENDER', 'RACE', 'AGE', 'SYMPTOMS']
         df = df[ordered_keys]
 
-        sparsifier = models.ThesisAIMEDAdvSymptomSparseMaker(num_symptoms=num_symptoms)
+        sparsifier = models.ThesisAIMEDAdvSymptomRaceSparseMaker(num_symptoms=num_symptoms)
 
         data_csc = sparsifier.fit_transform(df)
         end = timer()
@@ -740,7 +740,7 @@ def train_ai_med_adv_nb(
         ordered_keys = ['GENDER', 'RACE', 'AGE', 'SYMPTOMS']
         data = data[ordered_keys]
 
-        sparsifier = models.ThesisAIMEDAdvSymptomSparseMaker(num_symptoms=num_symptoms)
+        sparsifier = models.ThesisAIMEDAdvSymptomRaceSparseMaker(num_symptoms=num_symptoms)
 
         data = sparsifier.fit_transform(data)
 
