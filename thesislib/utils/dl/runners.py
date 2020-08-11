@@ -15,7 +15,7 @@ class Runner:
         self.test_loader = test_loader
         self.optimiser_name = kwargs.get('optimiser_name', "sgd")
         self.optimiser_params = kwargs.get('optimiser_params', {})
-        self.lr_start = kwargs.get('lr_start', 0.1)
+        self.lr_start = kwargs.get('lr_start', 0.0001)
         self.lr = self.lr_start
         self.visdom = kwargs.get('visdom', None)
         self.epochs = kwargs.get('epochs', 200)
