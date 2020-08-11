@@ -8,5 +8,5 @@ setup(
    author_email='',
    packages=find_packages(),
    install_requires=['pandas', 'numpy', 'matplotlib', 'requests', 'tabulate', 'scikit-learn', 'python-dateutil', 'torch'
-                     'visdom'],
+                     'visdom', 'boto3'],
 )

@@ -53,8 +53,7 @@ class DLSparseMaker(BaseEstimator):
 
         data = np.ones(len(rows))
         symptoms_race_coo = sparse.coo_matrix((data, (rows, columns)), shape=(df.shape[0], self.num_symptoms + 5))
-        data_coo = sparse.hstack([dense_matrix, symptoms_race_coo])
-        return data_coo
+        return sparse.hstack([dense_matrix, symptoms_race_coo]).tocsc()
 
     def fit_transform(self, df, y=None):
         self.fit(df)
@@ -63,8 +62,8 @@ class DLSparseMaker(BaseEstimator):
 
 class AiBasicMedDataset(Dataset):
     def __init__(self, data, labels, transform=None):
-        self.data = data
-        self.labels = labels
+        self.data = self.data_to_tensor(data)
+        self.labels = self.labels_to_tensor(labels)
         self.transform = transform
 
     def data_to_tensor(self, data):
@@ -80,8 +79,11 @@ class AiBasicMedDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        labels = self.labels_to_tensor(self.labels[idx])
-        data = self.data_to_tensor(self.data[idx, :])
+        # labels = self.labels_to_tensor(self.labels[idx])
+        # data = self.data_to_tensor(self.data[idx, :])
+
+        labels = self.labels[idx]
+        data = self.data[idx, :]
 
         return data, labels
 
@@ -107,7 +109,7 @@ class ClassificationBase(nn.Module):
 
     def print(self, epoch, result):
         print("Epoch [{}],train_loss: {:.4f}, train_acc: {:.4f} val_loss: {:.4f}, val_acc: {:.4f}"
-              .format(epoch, result['train_loss'], result['train_acc'], result['test_loss'], result['test_acc']))
+              .format(epoch, result['train_loss'], result['train_acc'], result['val_loss'], result['val_acc']))
 
 
 class DNN(ClassificationBase):
