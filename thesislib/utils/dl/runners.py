@@ -15,9 +15,7 @@ class Runner:
         self.test_loader = test_loader
         self.optimiser_name = kwargs.get('optimiser_name', "sgd")
         self.optimiser_params = kwargs.get('optimiser_params', {})
-        self.lr_start = kwargs.get('lr_start', 0.001)
-        self.lr_end = kwargs.get('lr_end', 0.001)
-        self.lr_decay = kwargs.get('lr_decay', 200)
+        self.lr_start = kwargs.get('lr_start', 0.1)
         self.lr = self.lr_start
         self.visdom = kwargs.get('visdom', None)
         self.epochs = kwargs.get('epochs', 200)
@@ -36,7 +34,7 @@ class Runner:
         if self.early_stop:
             pathlib.Path(self.checkpoint_dir).mkdir(exist_ok=True, parents=True)
             self.checkpoint_path = os.path.join(self.checkpoint_dir, self.checkpoint_name)
-            self.early_stopping = EarlyStopping(patience=10, verbose=False, path=self.checkpoint_path)
+            self.early_stopping = EarlyStopping(patience=20, verbose=False, path=self.checkpoint_path)
 
         self.train_loss = []
         self.train_acc = []

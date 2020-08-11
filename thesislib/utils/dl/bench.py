@@ -33,8 +33,9 @@ class Bench:
         self.epochs = kwargs.get("epochs", 200)
         self.random_state = kwargs.get("random_state", None)
         self.visdom_config = kwargs.get("visdom_config", None)
-        self.train_batch_size = kwargs.get("train_batch_size", 128)
-        self.val_batch_size = kwargs.get("val_batch_size", 128)
+        self.train_batch_size = kwargs.get("train_batch_size", 256)
+        self.val_batch_size = kwargs.get("val_batch_size", 256)
+        self.lr_start = kwargs.get("lr_start", 0.001)
         self.layer_config_file = kwargs.get("layer_config_file", None)
         self.non_linearity = kwargs.get("non_linearity", 'relu')
         self.tmp_directory = kwargs.get("tmp_dir", "/tmp")
@@ -143,7 +144,7 @@ class Bench:
 
         val_loader = DataLoader(
             val_data,
-            batch_size=self.train_batch_size,
+            batch_size=self.val_batch_size,
             shuffle=True,
             num_workers=4,
             pin_memory=True
