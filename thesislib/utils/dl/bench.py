@@ -53,6 +53,12 @@ class Bench:
         if self.layer_config_file is None:
             return None
 
+        if os.path.exists(self.layer_config_file):
+            with open(self.layer_config_file) as fp:
+                config = json.load(fp)
+
+            return config
+
         session = botocore.session.get_session()
         s3 = session.create_client('s3', region_name=AWS_REGION)
         obj = s3.Object(S3_BUCKET, self.layer_config_file)
@@ -182,17 +188,27 @@ class Bench:
         mlflow.set_tracking_uri(self.mlflow_uri)
         mlflow.set_experiment(self.run_name)
         with mlflow.start_run():
-            self.runner = self.compose_runner()
+            try:
+                self.runner = self.compose_runner()
 
-            # fit
-            begin = timer()
-            self.runner.fit()
-            self.run_metrics['fit_time'] = timer() - begin
+                # fit
+                begin = timer()
+                self.runner.fit()
+                self.run_metrics['fit_time'] = timer() - begin
 
-            # save results
-            self.save_results()
+                # save results
+                self.save_results()
+                message = "success"
+                self.run_metrics['complete'] = 1
+            except Exception as e:
+                self.run_metrics['complete'] = 0
+                message = str(e)
 
             mlflow.log_metrics(self.run_metrics)
+            mlflow.log_params({
+                'message': message,
+                'run_name': self.run_name
+            })
 
     def save_results(self):
         if os.path.exists(self.runner.early_stopping.path):
