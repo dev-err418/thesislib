@@ -35,7 +35,7 @@ class Bench:
         self.visdom_config = kwargs.get("visdom_config", None)
         self.train_batch_size = kwargs.get("train_batch_size", 256)
         self.val_batch_size = kwargs.get("val_batch_size", 256)
-        self.lr_start = kwargs.get("lr_start", 0.001)
+        self.lr_start = kwargs.get("lr_start", 0.1)
         self.layer_config_file = kwargs.get("layer_config_file", None)
         self.non_linearity = kwargs.get("non_linearity", 'relu')
         self.tmp_directory = kwargs.get("tmp_dir", "/tmp")
@@ -166,7 +166,7 @@ class Bench:
         if visdom is None:
             print("Say whaaa!")
 
-        return Runner(model, train_loader, val_loader, visdom=visdom, epochs=self.epochs)
+        return Runner(model, train_loader, val_loader, visdom=visdom, epochs=self.epochs, lr_start=self.lr_start)
 
     def compose_model(self):
         begin = timer()
