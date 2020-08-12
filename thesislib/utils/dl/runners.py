@@ -22,7 +22,7 @@ class Runner:
         self.early_stop = kwargs.get('early_stop', True)
         self.checkpoint_dir = kwargs.get('checkpoint_path', 'checkpoints')
         self.checkpoint_name = kwargs.get('checkpoint_dir', 'checkpoint.pt')
-        self.has_scheduler = kwargs.get('has_scheduler', False)
+        self.has_scheduler = kwargs.get('has_scheduler', True)
         self.checkpoint_path = None
         self.run_counter = 0
         self.train_loss = []
@@ -31,7 +31,12 @@ class Runner:
         self.optimiser = self.optimiser_cls(self.model.parameters(), lr=self.lr, **self.optimiser_params)
 
         if self.has_scheduler:
-            self.scheduler = ReduceLROnPlateau(self.optimiser, mode='min')
+            self.scheduler = ReduceLROnPlateau(
+                self.optimiser,
+                mode='min',
+                patience=10,
+                threshold=1e-5
+            )
         else:
             self.scheduler = None
 
