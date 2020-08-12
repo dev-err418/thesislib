@@ -22,13 +22,18 @@ class Runner:
         self.early_stop = kwargs.get('early_stop', True)
         self.checkpoint_dir = kwargs.get('checkpoint_path', 'checkpoints')
         self.checkpoint_name = kwargs.get('checkpoint_dir', 'checkpoint.pt')
+        self.has_scheduler = kwargs.get('has_scheduler', False)
         self.checkpoint_path = None
         self.run_counter = 0
         self.train_loss = []
         self.validation_loss = []
         self.optimiser_cls = self.get_optimiser()
         self.optimiser = self.optimiser_cls(self.model.parameters(), lr=self.lr, **self.optimiser_params)
-        self.scheduler = ReduceLROnPlateau(self.optimiser, mode='min')
+
+        if self.has_scheduler:
+            self.scheduler = ReduceLROnPlateau(self.optimiser, mode='min')
+        else:
+            self.scheduler = None
 
         self.early_stopping = None
         if self.early_stop:
@@ -121,7 +126,8 @@ class Runner:
             train_losses, train_accuracies = self.model.summarize(train_losses, train_accuracies)
             val_losses, val_accuracies = self.model.summarize(val_losses, val_accuracies)
 
-            self.scheduler.step(val_losses)
+            if self.scheduler is not None:
+                self.scheduler.step(val_losses)
 
             result = {
                 'train_loss': train_losses,
