@@ -173,6 +173,7 @@ class Bench:
             visdom=visdom,
             epochs=self.epochs,
             lr_start=self.lr_start,
+            optimiser_name="adam",
             optimiser_params={
                 "betas": ( 0.001, 0.0001),
                 "amsgrad": True
