@@ -1,6 +1,7 @@
 from thesislib.utils.dl.utils import VisdomConfig, get_default_device, DeviceDataLoader, to_device
 from thesislib.utils.dl.models import DLSparseMaker, AiBasicMedDataset, DNN
 from thesislib.utils.dl.runners import Runner
+from thesislib.utils.dl.dae import DAERunner, DAE
 
 from torch.utils.data import DataLoader
 import torch
@@ -9,7 +10,7 @@ import json
 import os
 import botocore.session
 import pandas as pd
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
 import visdom
 import time
 import math
@@ -289,6 +290,231 @@ def train_dl(
         num_conditions,
         visdom_config=visdom_config,
         layer_config=layer_config_file,
+        **kwargs
+    )
+
+    bench.run()
+
+
+class DAEBench:
+    def __init__(self, run_name, train_file, mlflow_uri, input_dim, target_dim, num_symptoms, **kwargs):
+        self.train_file = train_file
+        self.num_symptoms = num_symptoms
+        self.input_dim = input_dim
+        self.target_dim = target_dim
+        self.run_name = run_name
+
+        self.train_size = kwargs.get("train_size", 0.8)
+        self.epochs = kwargs.get("epochs", 200)
+        self.random_state = kwargs.get("random_state", None)
+        self.visdom_config = kwargs.get("visdom_config", None)
+        self.train_batch_size = kwargs.get("train_batch_size", 128)
+        self.val_batch_size = kwargs.get("val_batch_size", 256)
+        self.lr_start = kwargs.get("lr_start", 0.001)
+        self.tmp_directory = kwargs.get("tmp_dir", "/tmp")
+        self.mlflow_uri = mlflow_uri
+
+        self.runner = None
+        self.run_metrics = {}
+
+        self.device = get_default_device()
+        self.data = self.read_data()
+
+    def connect_visdom(self):
+        if self.visdom_config is None:
+            return None
+
+        return visdom.Visdom(
+            server=self.visdom_config.url,
+            port=self.visdom_config.port,
+            username=self.visdom_config.username,
+            password=self.visdom_config.password,
+            use_incoming_socket=False,
+            env=self.visdom_config.env
+        )
+
+    def split_data(self):
+        begin = timer()
+        split_selector = ShuffleSplit(
+            n_splits=1,
+            train_size=self.train_size,
+            random_state=self.random_state
+        )
+
+        train_data = None
+        val_data = None
+        for train_index, val_index in split_selector.split(self.data):
+            train_data = self.data.iloc[train_index]
+            val_data = self.data.iloc[val_index]
+
+        self.run_metrics['split_data_time'] = timer() - begin
+        return train_data, val_data
+
+    def read_data(self):
+        begin = timer()
+        df = pd.read_csv(self.train_file, index_col="Index")
+
+        df = df.drop(columns=['LABEL'])
+
+        self.run_metrics['read_data_time'] = timer() - begin
+        return df
+
+    def prep_loaders(self):
+        train_data, val_data = self.split_data()
+
+        begin = timer()
+        sparsifier = DLSparseMaker(self.num_symptoms)
+        sparsifier.fit(train_data)
+
+        train_data = sparsifier.transform(train_data)[:, 2:]
+        val_data = sparsifier.transform(val_data)[:, 2:]
+
+        input_dim = train_data.shape[1]
+        assert input_dim == self.input_dim, \
+            "Dimension of prepped data (%d) does not match specified input dimension (%d)" % (input_dim, self.input_dim)
+
+        self.run_metrics['sparsify_data_time'] = timer() - begin
+
+        begin = timer()
+        train_data = AiBasicMedDataset(train_data)
+        val_data = AiBasicMedDataset(val_data)
+
+        train_loader = DataLoader(
+            train_data,
+            batch_size=self.train_batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True
+        )
+
+        val_loader = DataLoader(
+            val_data,
+            batch_size=self.val_batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True
+        )
+
+        train_loader = DeviceDataLoader(train_loader, self.device)
+        val_loader = DeviceDataLoader(val_loader, self.device)
+
+        self.run_metrics['data_loader_time'] = timer() - begin
+
+        return train_loader, val_loader
+
+    def compose_runner(self):
+
+        train_loader, val_loader = self.prep_loaders()
+        model = self.compose_model()
+        visdom = self.connect_visdom()
+
+        return DAERunner(
+            model,
+            train_loader,
+            val_loader,
+            visdom=visdom,
+            epochs=self.epochs,
+            lr_start=self.lr_start,
+        )
+
+    def compose_model(self):
+        begin = timer()
+        model = DAE(input_dim=self.input_dim, target_dim=self.target_dim)
+
+        model = to_device(model, self.device)
+
+        self.run_metrics['model_composition_time'] = timer() - begin
+
+        return model
+
+    def run(self):
+        # compose the runner
+        self.run_metrics = {}
+        mlflow.set_tracking_uri(self.mlflow_uri)
+        mlflow.set_experiment(self.run_name)
+        with mlflow.start_run():
+            try:
+                self.runner = self.compose_runner()
+
+                # fit
+                begin = timer()
+                self.runner.fit()
+                self.run_metrics['fit_time'] = timer() - begin
+
+                # save results
+                self.save_results()
+                message = "success"
+                self.run_metrics['complete'] = 1
+            except Exception as e:
+                raise e
+                self.run_metrics['complete'] = 0
+                message = str(e)
+
+            mlflow.log_metrics(self.run_metrics)
+            mlflow.log_params({
+                'message': message,
+                'run_name': self.run_name
+            })
+
+    def save_results(self):
+        if os.path.exists(self.runner.early_stopping.path):
+            model_dict = torch.load(self.runner.early_stopping.path)
+        else:
+            model_dict = self.runner.model.state_dict()
+
+        epoch_count = self.runner.get_epoch()
+        self.run_metrics['epochs'] = epoch_count
+        self.run_metrics['train_loss'] = self.runner.train_loss[epoch_count-1].item()
+        self.run_metrics['test_loss'] = self.runner.val_loss[epoch_count - 1].item()
+
+        data = {
+            "input_dim": self.input_dim,
+            "target_dim": self.target_dim,
+            "train_loss": self.runner.train_loss,
+            "val_loss": self.runner.val_loss,
+            "epoch": epoch_count,
+            "model_dict": model_dict
+        }
+
+        filename = "%d.torch" % int(math.ceil(time.time()))
+        tmp_path = os.path.join(self.tmp_directory, filename)
+        s3_filename = self.run_name + "/" + filename
+
+        torch.save(data, tmp_path)
+        mlflow.log_artifact(tmp_path, s3_filename)
+        return True
+
+
+def train_dae(
+        run_name,
+        train_file,
+        mlflow_uri,
+        input_dim,
+        target_dim,
+        num_sympoms,
+        visdom_url,
+        visdom_port,
+        visdom_username,
+        visdom_password,
+        visdom_env,
+        **kwargs
+):
+
+    visdom_config = VisdomConfig
+    visdom_config.url = visdom_url
+    visdom_config.port = visdom_port
+    visdom_config.username = visdom_username
+    visdom_config.password = visdom_password
+    visdom_config.env = visdom_env
+
+    bench = DAEBench(
+        run_name,
+        train_file,
+        mlflow_uri,
+        input_dim,
+        target_dim,
+        num_sympoms,
+        visdom_config=visdom_config,
         **kwargs
     )
 

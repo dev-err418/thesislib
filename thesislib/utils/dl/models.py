@@ -61,7 +61,7 @@ class DLSparseMaker(BaseEstimator):
 
 
 class AiBasicMedDataset(Dataset):
-    def __init__(self, data, labels, transform=None):
+    def __init__(self, data, labels=None, transform=None):
         self.data = self.data_to_tensor(data)
         self.labels = self.labels_to_tensor(labels)
         self.transform = transform
@@ -69,23 +69,25 @@ class AiBasicMedDataset(Dataset):
     def data_to_tensor(self, data):
         return torch.FloatTensor(data.todense())
 
-    def labels_to_tensor(self, labels):
+    def labels_to_tensor(self, labels=None):
+        if labels is None:
+            return None
+
         return torch.LongTensor(labels)
 
     def __len__(self):
-        return self.labels.shape[0]
+        return self.data.shape[0]
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        # labels = self.labels_to_tensor(self.labels[idx])
-        # data = self.data_to_tensor(self.data[idx, :])
-
-        labels = self.labels[idx]
         data = self.data[idx, :]
+        if self.labels is not None:
+            labels = self.labels[idx]
+            return data, labels
 
-        return data, labels
+        return data
 
 
 class ClassificationBase(nn.Module):
