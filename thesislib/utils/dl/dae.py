@@ -168,8 +168,8 @@ class DAERunner:
                 self.scheduler.step(val_losses)
 
             result = {
-                'train_loss': train_losses,
-                'val_loss': val_losses,
+                'train_loss': train_losses.item(),
+                'val_loss': val_losses.item(),
                 'epoch': epoch
             }
 

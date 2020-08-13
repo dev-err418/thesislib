@@ -446,7 +446,6 @@ class DAEBench:
                 message = "success"
                 self.run_metrics['complete'] = 1
             except Exception as e:
-                raise e
                 self.run_metrics['complete'] = 0
                 message = str(e)
 
