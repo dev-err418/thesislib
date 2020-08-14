@@ -102,8 +102,14 @@ class AiDAEMedDataset(AiBasicMedDataset):
         labels = self.labels[idx]
 
         with torch.no_grad():
-            compressed = self.dae.encoder(data[:, 2:])
-            data = torch.cat([data[:, :2], compressed], dim=1)
+            if len(data.shape) == 1:
+                data = data.view(1, -1)
+                compressed = self.dae.encoder(data[:, 2:])
+                combined = torch.cat([data[:, :2], compressed])
+                data = combined.view(-1)
+            else:
+                compressed = self.dae.encoder(data[:, 2:])
+                data = torch.cat([data[:, :2], compressed], dim=1)
 
         return data, labels
 
