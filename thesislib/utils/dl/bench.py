@@ -728,6 +728,7 @@ class PreDAEBench:
                 message = "success"
                 self.run_metrics['complete'] = 1
             except Exception as e:
+                raise e
                 self.run_metrics['complete'] = 0
                 message = str(e)
 
@@ -779,7 +780,7 @@ def train_aedl(
         train_file,
         mlflow_uri,
         input_dim,
-        num_sympoms,
+        num_symptoms,
         num_conditions,
         visdom_url,
         visdom_port,
@@ -803,7 +804,7 @@ def train_aedl(
         train_file,
         mlflow_uri,
         input_dim,
-        num_sympoms,
+        num_symptoms,
         num_conditions,
         visdom_config=visdom_config,
         layer_config=layer_config_file,
