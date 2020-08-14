@@ -105,7 +105,7 @@ class AiDAEMedDataset(AiBasicMedDataset):
             if len(data.shape) == 1:
                 data = data.view(1, -1)
                 compressed = self.dae.encoder(data[:, 2:])
-                combined = torch.cat([data[:, :2], compressed])
+                combined = torch.cat([data[:, :2], compressed], dim=1)
                 data = combined.view(-1)
             else:
                 compressed = self.dae.encoder(data[:, 2:])
