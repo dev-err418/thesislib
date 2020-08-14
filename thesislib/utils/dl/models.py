@@ -59,7 +59,6 @@ class DLSparseMaker(BaseEstimator):
         self.fit(df)
         return self.transform(df)
 
-
 class AiBasicMedDataset(Dataset):
     def __init__(self, data, labels=None, transform=None):
         self.data = self.data_to_tensor(data)
@@ -88,6 +87,25 @@ class AiBasicMedDataset(Dataset):
             return data, labels
 
         return data
+
+
+class AiDAEMedDataset(AiBasicMedDataset):
+    def __init__(self, data, labels, dae):
+        super(AiDAEMedDataset, self).__init__(data, labels=labels)
+        self.dae = dae
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        data = self.data[idx, :]
+        labels = self.labels[idx]
+
+        with torch.no_grad():
+            compressed = self.dae.encoder(data[:, 2:])
+            data = torch.cat([data[:, :2], compressed], dim=1)
+
+        return data, labels
 
 
 class ClassificationBase(nn.Module):
