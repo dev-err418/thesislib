@@ -70,17 +70,17 @@ class Runner:
 
         for batch in loader:
             if is_train:
+                self.optimiser.zero_grad()
                 loss, acc = self.model.step(batch)
                 self.run_counter += 1
                 loss.backward()
                 self.optimiser.step()
-                self.optimiser.zero_grad()
             else:
                 with torch.no_grad():
                     loss, acc = self.model.step(batch)
 
-            losses.append(loss.detach())
-            accuracies.append(acc.detach())
+            losses.append(loss)
+            accuracies.append(acc)
 
         return losses, accuracies
 
@@ -128,24 +128,24 @@ class Runner:
             train_losses, train_accuracies = self.run()
             val_losses, val_accuracies = self.run(is_train=False)
 
-            train_losses, train_accuracies = self.model.summarize(train_losses, train_accuracies)
-            val_losses, val_accuracies = self.model.summarize(val_losses, val_accuracies)
+            train_loss, train_accuracy = self.model.summarize(train_losses, train_accuracies)
+            val_loss, val_accuracy = self.model.summarize(val_losses, val_accuracies)
 
             if self.scheduler is not None:
-                self.scheduler.step(val_losses)
+                self.scheduler.step(val_loss)
 
             result = {
-                'train_loss': train_losses,
-                'train_acc': train_accuracies,
-                'val_loss': val_losses,
-                'val_acc': val_accuracies,
+                'train_loss': train_loss,
+                'train_acc': train_accuracy,
+                'val_loss': val_loss,
+                'val_acc': val_accuracy,
                 'epoch': epoch
             }
 
-            self.train_loss.append(train_losses)
-            self.train_acc.append(train_accuracies)
-            self.val_loss.append(val_losses)
-            self.val_acc.append(val_accuracies)
+            self.train_loss.append(train_loss)
+            self.train_acc.append(train_accuracy)
+            self.val_loss.append(val_loss)
+            self.val_acc.append(val_accuracy)
 
             self.model.print(epoch, result)
 
@@ -153,7 +153,7 @@ class Runner:
             will_break = False
 
             if self.early_stop:
-                self.early_stopping(val_losses, self.model, epoch+1)
+                self.early_stopping(val_loss, self.model, epoch+1)
 
                 if self.early_stopping.early_stop:
                     will_break = True

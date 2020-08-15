@@ -39,8 +39,7 @@ class DAE (nn.Module):
             nn.Tanh(),
             nn.Linear(in_features=128, out_features=256),
             nn.Tanh(),
-            nn.Linear(in_features=256, out_features=self.input_dim),
-            nn.Sigmoid()
+            nn.Linear(in_features=256, out_features=self.input_dim)
         )
 
     def forward(self, data):
@@ -102,9 +101,8 @@ class DAERunner:
         return optimiser
 
     def step(self, batch):
-        data = batch
-        out = self.model(data)  # Generate reconstructed output
-        loss = F.binary_cross_entropy(out, data)
+        out = self.model(batch)  # Generate reconstructed output
+        loss = F.binary_cross_entropy_with_logits(out, batch, reduction='sum')
         return loss
 
     def run(self, is_train=True):
@@ -123,7 +121,7 @@ class DAERunner:
                 with torch.no_grad():
                     loss = self.step(batch)
 
-            losses.append(loss.detach())
+            losses.append(loss)
 
         return losses
 
@@ -161,20 +159,21 @@ class DAERunner:
             train_losses = self.run()
             val_losses = self.run(is_train=False)
 
-            train_losses = torch.stack(train_losses).mean()
-            val_losses = torch.stack(val_losses).mean()
+            with torch.no_grad():
+                train_loss = torch.stack(train_losses).mean()
+                val_loss = torch.stack(val_losses).mean()
 
             if self.scheduler is not None:
-                self.scheduler.step(val_losses)
+                self.scheduler.step(val_loss)
 
             result = {
-                'train_loss': train_losses.item(),
-                'val_loss': val_losses.item(),
+                'train_loss': train_loss.item(),
+                'val_loss': val_loss.item(),
                 'epoch': epoch
             }
 
-            self.train_loss.append(train_losses)
-            self.val_loss.append(val_losses)
+            self.train_loss.append(train_loss)
+            self.val_loss.append(val_loss)
 
             self.print(epoch, result)
 

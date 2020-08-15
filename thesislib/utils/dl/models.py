@@ -59,6 +59,7 @@ class DLSparseMaker(BaseEstimator):
         self.fit(df)
         return self.transform(df)
 
+
 class AiBasicMedDataset(Dataset):
     def __init__(self, data, labels=None, transform=None):
         self.data = self.data_to_tensor(data)
@@ -128,8 +129,9 @@ class ClassificationBase(nn.Module):
         return torch.tensor(torch.sum(preds == labels).item() / len(preds))
 
     def summarize(self, losses, accuracies):
-        loss = torch.stack(losses).mean()
-        accuracy = torch.stack(accuracies).mean()
+        with torch.no_grad():
+            loss = torch.stack(losses).mean()
+            accuracy = torch.stack(accuracies).mean()
 
         return loss.item(), accuracy.item()
 
@@ -187,7 +189,6 @@ class DNN(ClassificationBase):
             layers['linear-%d' % idx] = nn.Linear(input_dim, output_dim)
             if idx != len(self.layer_config) - 1:
                 layers['nonlinear-%d' % idx] = non_linear()
-        layers['final-soft-max'] = nn.Softmax(dim=1)
         return nn.Sequential(layers)
 
     # Called with either one element to determine next action, or a batch
