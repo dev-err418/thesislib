@@ -189,6 +189,14 @@ class MasterRunner:
                 train_loss, train_acc = dl_train(model, train_loader, optimizer)
                 val_loss, val_acc = dl_val(model, val_loader)
 
+                print("Epoch %d: Train: loss: %.5f\t acc: %.5f\nVal: loss: %.5f\t acc: %.5f" % (
+                    idx + 1,
+                    train_loss,
+                    train_acc,
+                    val_loss,
+                    val_acc
+                ))
+
                 train_accs.append(train_acc)
                 train_losses.append(train_loss)
                 val_accs.append(val_acc)
