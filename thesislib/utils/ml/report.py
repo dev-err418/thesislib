@@ -1,5 +1,5 @@
 from sklearn.metrics import confusion_matrix, make_scorer, accuracy_score, \
-    f1_score, recall_score, precision_score, roc_auc_score
+    f1_score, recall_score, precision_score
 from tabulate import tabulate
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
@@ -14,8 +14,6 @@ RECALL_UNWEIGHTED = 'recall_unweighted'
 RECALL_WEIGHTED = 'recall_weighted'
 PRECISION_UNWEIGHTED = 'precision_unweighted'
 PRECISION_WEIGHTED = 'precision_weighted'
-#ROC_UNWEIGHTED = 'roc_auc_unweighted'
-#ROC_WEIGHTED = 'roc_auc_weighted'
 TOP2_SCORE = 'top_2'
 TOP5_SCORE = 'top_5'
 
@@ -83,8 +81,6 @@ def get_tracked_metrics(classes, metric_name=None):
     recall_scorer_weighted = make_scorer(recall_score, average='weighted')
     precision_scorer_unweighted = make_scorer(precision_score, average='macro', zero_division=1)
     precision_scorer_weighted = make_scorer(precision_score, average='weighted', zero_division=1)
-    #roc_auc_scorer_unweighted = make_scorer(roc_auc_score, average='macro', multi_class='ovo', needs_proba=True)
-    #roc_auc_scorer_weighted = make_scorer(roc_auc_score, average='weighted', multi_class='ovr', needs_proba=True)
     top_2_scorer = make_scorer(top_n_score, needs_proba=True, class_labels=classes, top_n=2)
     top_5_scorer = make_scorer(top_n_score, needs_proba=True, class_labels=classes, top_n=5)
 
@@ -98,9 +94,8 @@ def get_tracked_metrics(classes, metric_name=None):
         'recall_weighted': recall_scorer_weighted,
         'precision_unweighted': precision_scorer_unweighted,
         'precision_weighted': precision_scorer_weighted,
-        #'roc_auc_unweighted': roc_auc_scorer_unweighted,
-        #'roc_auc_weighted': roc_auc_scorer_weighted
     }
+
 
     if metric_name is not None:
         if type(metric_name) is list:
@@ -110,20 +105,10 @@ def get_tracked_metrics(classes, metric_name=None):
 
     return metrics
 
-TELEGRAM_CHAT_ID = "@oagba_qce_aws"
-
-BASE_URL = "https://api.telegram.org/bot1150250526:AAEFxR2OCQZN5p7ppJtHiIe2tDTb1ebFAKY/"
-
-S3_BUCKET = "qcedelft"
-
-AWS_REGION = "us-east-1"
-
-TERMINATE_URL = "http://999-term.teliov.xyz/lasaksalkslasl"
-
 
 class Logger(object):
 
-    def __init__(self, logger_name, active=True):
+    def __init__(self, logger_name, active=True, telegram_chat_id=None):
 
         self.logger_name = logger_name
         self.stream = io.StringIO()
@@ -131,6 +116,7 @@ class Logger(object):
         self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(logging.DEBUG)
         self.active = active
+        self.telegram_chat_id = telegram_chat_id
 
         for handler in self.logger.handlers:
             self.logger.removeHandler(handler)
@@ -143,8 +129,8 @@ class Logger(object):
         message = "%s: %s" % (self.logger_name, message)
         self.logger.log(level, message)
 
-        if to_telegram:
-            send_message_telegram(message)
+        if to_telegram and self.telegram_chat_id is not None:
+            send_message_telegram(message, self.telegram_chat_id)
         return True
 
     def to_string(self):
@@ -153,9 +139,12 @@ class Logger(object):
         return self.stream.getvalue()
 
 
-def send_message_telegram(message):
+def send_message_telegram(message, telegram_chat_id=None):
+    if telegram_chat_id is None:
+        # do nothing
+        return
     payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
+        'chat_id': telegram_chat_id,
         'text': message
     }
 

@@ -1,6 +1,6 @@
 from thesislib.utils.dl.utils import VisdomConfig, get_default_device, DeviceDataLoader, to_device
 from thesislib.utils.dl.models import DLSparseMaker, AiBasicMedDataset, AiDAEMedDataset,  DNN
-from thesislib.utils.dl.runners import Runner
+from thesislib.utils.dl.runners import Runner, MasterRunner
 from thesislib.utils.dl.dae import DAERunner, DAE
 
 from torch.utils.data import DataLoader
@@ -259,41 +259,28 @@ class Bench:
 
 
 def train_dl(
-        run_name,
         train_file,
         mlflow_uri,
-        input_dim,
-        num_sympoms,
-        num_conditions,
-        visdom_url,
-        visdom_port,
-        visdom_username,
-        visdom_password,
-        visdom_env,
-        layer_config_file,
-        **kwargs
 ):
 
-    visdom_config = VisdomConfig
-    visdom_config.url = visdom_url
-    visdom_config.port = visdom_port
-    visdom_config.username = visdom_username
-    visdom_config.password = visdom_password
-    visdom_config.env = visdom_env
+    mlflow_params = {
+        'train_size': 1,
+        'fold_number': 5,
+        'model': 'DNN',
+        'optimizer': 'SDG',
+        'non_linearity': 'ReLU',
+        'run_name': 'dnn_basic_15k'
+    }
 
-    bench = Bench(
-        run_name,
+    runner = MasterRunner(
         train_file,
-        mlflow_uri,
-        input_dim,
-        num_sympoms,
-        num_conditions,
-        visdom_config=visdom_config,
-        layer_config=layer_config_file,
-        **kwargs
+        epochs=50,
+        mlflow_uri=mlflow_uri,
+        mlflow_params=mlflow_params,
+        run_name='dnn_basic_15k'
     )
 
-    bench.run()
+    runner.run()
 
 
 class DAEBench:
