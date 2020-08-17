@@ -259,7 +259,7 @@ class MasterRunner:
                 mlflow.log_artifact(filename, 'dl_model.torch')
 
 
-class Runner_:
+class Runner:
     def __init__(self, model, train_loader, test_loader, **kwargs):
         self.model = model
         self.train_loader = train_loader
