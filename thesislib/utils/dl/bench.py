@@ -1,5 +1,6 @@
 from thesislib.utils.dl.utils import VisdomConfig, get_default_device, DeviceDataLoader, to_device
-from thesislib.utils.dl.models import DLSparseMaker, AiBasicMedDataset, AiDAEMedDataset,  DNN
+from thesislib.utils.dl.data import DLSparseMaker, AiBasicMedDataset, AiDAEMedDataset
+from thesislib.utils.dl.models import DNN
 from thesislib.utils.dl.runners import Runner, MasterRunner
 from thesislib.utils.dl.dae import DAERunner, DAE
 
