@@ -181,7 +181,7 @@ class DAERunner:
             will_break = False
 
             if self.early_stop:
-                self.early_stopping(val_losses, self.model, epoch+1)
+                self.early_stopping(val_loss, self.model, epoch+1)
 
                 if self.early_stopping.early_stop:
                     will_break = True
