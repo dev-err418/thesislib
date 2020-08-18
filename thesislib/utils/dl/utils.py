@@ -204,7 +204,7 @@ def compute_top_n(out, labels, n):
     sorted_prob = torch.argsort(out, dim=1, descending=True)
     top_n = sorted_prob[:, :n]
 
-    combined = top_n == labels.view(1, -1)
+    combined = top_n == labels.view(-1, 1)
     top_n_accurate = torch.sum(combined).item()
     num_samples = labels.shape[0]
 
