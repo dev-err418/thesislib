@@ -187,7 +187,7 @@ def compute_precision(confusion_matrix):
 
     weighted_precision = torch.true_divide(unweighted_precision * label_counts, num_samples)
 
-    return weighted_precision.item()
+    return torch.sum(weighted_precision).item()
 
 
 def compute_top_n(out, labels, n):
