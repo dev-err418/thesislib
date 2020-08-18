@@ -66,7 +66,7 @@ def calculate_precision_accuracy_top_5(model, loader, num_labels, device=None):
         for item in loader:
             batch, y_true = item
             out = model(batch)
-            y_pred = torch.max(out, dim=1)
+            _, y_pred = torch.max(out, dim=1)
             cnf = get_cnf_matrix(y_true, y_pred, unique_labels)
             cm.add_(cnf)
             top_5_acc, batch_samples = compute_top_n(out, y_true, 5)
