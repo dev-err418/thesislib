@@ -103,10 +103,11 @@ class VisdomConfig:
     env = None
 
 
-def split_data(data, labels, train_size):
+def split_data(data, labels, train_size, random_state=None):
     split_selector = StratifiedShuffleSplit(
         n_splits=1,
-        train_size=train_size
+        train_size=train_size,
+        random_state=random_state
     )
 
     train_data = None

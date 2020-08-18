@@ -53,14 +53,11 @@ def dl_val(model, val_loader):
     return batch_loss, batch_acc
 
 
-def calculate_precision_accuracy_top_5(model, loader, num_labels, device=None):
+def calculate_precision_accuracy_top_5(model, loader, num_labels):
     top_5_count = 0
     num_samples = 0
     cm = torch.zeros((num_labels, num_labels))
     unique_labels = torch.LongTensor(range(num_labels))
-    if device is not None:
-        cm = to_device(cm, device)
-        unique_labels = to_device(unique_labels, device)
 
     with torch.no_grad():
         for item in loader:
@@ -99,6 +96,7 @@ class MasterRunner:
         self.mlflow_uri = kwargs.get("mlflow_uri", None)
         self.mlflow_params = kwargs.get("mlflow_params", {})
         self.run_name = kwargs.get("run_name", "test_dl_run")
+        self.fold_number = kwargs.get("fold_number", 5)
 
         self.early_stop = kwargs.get('early_stop', True)
         self.early_stop_patience = kwargs.get('early_stop_patience', 5)
@@ -121,7 +119,7 @@ class MasterRunner:
         labels = df.LABEL.values
         df = df.drop(columns=['LABEL'])
 
-        train_data, train_labels, val_data, val_labels = split_data(df, labels, self.train_split_size)
+        train_data, train_labels, val_data, val_labels = split_data(df, labels, self.train_split_size, self.fold_number)
 
         sparsifier = DLSparseMaker(self.num_symptoms)
         sparsifier.fit(train_data)
@@ -220,33 +218,11 @@ class MasterRunner:
 
             if stopped_early:
                 state_dict = torch.load(self.early_stopping.path)
-                model.load_state_dict(state_dict)
             else:
                 state_dict = model.state_dict()
 
-            # need to calculate the precision, and top_5 accuracy on train and val set
-            start = timer()
-            train_precision, train_accuracy, train_top_5 = calculate_precision_accuracy_top_5(
-                model,
-                train_loader,
-                self.num_conditions,
-                self.device
-            )
-            metrics['train_score_time'] = timer() - start
-
-            start = timer()
-            val_precision, val_accuracy, val_top_5 = calculate_precision_accuracy_top_5(
-                model,
-                val_loader,
-                self.num_conditions,
-                self.device
-            )
-            metrics['train_score_time'] = timer() - start
-
-            metrics['train_precision'] = train_precision
-            metrics['train_accuracy'] = train_accuracy
-            metrics['val_precision'] = val_precision
-            metrics['val_accuracy'] = val_accuracy
+            # we'll calculate the precision and the other parameters after training, we know the random state
+            # so we can do a deterministic recreation of the train/val split
             metrics['run_time'] = timer() - begin
 
             # save results ! mlflow?
