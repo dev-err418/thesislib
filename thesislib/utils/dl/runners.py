@@ -56,8 +56,12 @@ def dl_val(model, val_loader):
 def calculate_precision_accuracy_top_5(model, loader, num_labels, device=None):
     top_5_count = 0
     num_samples = 0
-    cm = torch.zeros((num_labels, num_labels), device=None)
-    unique_labels = torch.LongTensor(range(num_labels), device=device)
+    cm = torch.zeros((num_labels, num_labels))
+    unique_labels = torch.LongTensor(range(num_labels))
+    if device is not None:
+        cm = to_device(cm, device)
+        unique_labels = to_device(unique_labels, device)
+
     with torch.no_grad():
         for item in loader:
             batch, y_true = item
