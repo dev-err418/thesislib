@@ -51,7 +51,8 @@ def _symptom_transform(val, labels, is_nlice=False):
     else:
         indices = []
         for item in parts:
-            _ = labels.get(item)
+            i = item.split(":")[0]
+            _ = labels.get(i)
             if _ is None:
                 raise ValueError("Unknown symptom")
             indices.append(_)
