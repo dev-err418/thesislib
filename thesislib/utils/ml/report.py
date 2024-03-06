@@ -65,7 +65,7 @@ def top_n_score(y_target, y_pred, class_labels, top_n=10, weighted=True):
     encoded_probability = encoded_probability.reshape(encoded_probability.shape[0], )
 
     bool_top_n = encoded_labels.reshape(-1, 1) == top_n_predictions
-    bool_top_n = np.sum(bool_top_n, axis=1).astype(np.bool)
+    bool_top_n = np.sum(bool_top_n, axis=1).astype(np.bool_)
     combined = np.logical_and(bool_top_n, (encoded_probability > 0))
 
     score = sum(combined) if not weighted else sum(combined)/combined.shape[0]
