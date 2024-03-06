@@ -465,14 +465,14 @@ class ThesisSymptomRaceSparseMaker(BaseEstimator):
 class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
     def __init__(self, classifier_map, classes=None):
         self.fitted = False
-        self.classes = classes
+        self.classes_ = classes
         self.labelbin = None
         self.classifier_map = classifier_map
 
     def fit_classes(self, classes):
         self.labelbin = LabelBinarizer()
         self.labelbin.fit(classes)
-        self.classes = self.labelbin.classes_
+        self.classes_ = self.labelbin.classes_
 
     @staticmethod
     def _get_data(keys, X):
@@ -500,8 +500,8 @@ class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
         :param y:
         :return:
         """
-        if self.classes is None or self.labelbin is None:
-            classes = self.classes if self.classes is not None else np.unique(y)
+        if self.classes_ is None or self.labelbin is None:
+            classes = self.classes_ if self.classes_ is not None else np.unique(y)
             self.fit_classes(classes)
 
         _y = self.labelbin.fit_transform(y)
@@ -523,7 +523,7 @@ class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
         if not self.fitted:
             raise ValueError("Model has not been fitted.")
 
-        _probs = np.zeros((X.shape[0], self.classes.shape[0]))
+        _probs = np.zeros((X.shape[0], self.classes_.shape[0]))
 
         for idx in range(len(self.classifier_map)):
             clf, keys = self.classifier_map[idx]
@@ -548,12 +548,12 @@ class ThesisSparseNaiveBayes(BaseEstimator, ClassifierMixin):
         if not self.fitted:
             raise ValueError("Model has not been fitted.")
         jll = self._joint_log_likelihood(X)
-        return self.classes[np.argmax(jll, axis=1)]
+        return self.classes_[np.argmax(jll, axis=1)]
 
     def serialize(self):
         return {
             "fitted": self.fitted,
-            "classes": self.classes,
+            "classes": self.classes_,
             "classifier_map": self.classifier_map,
         }
 
